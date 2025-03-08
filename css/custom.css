@@ -1,0 +1,11 @@
+@font-face {
+    font-family: 'Gill Sans Custom';
+    src: url('/fonts/GillsansC.woff2') format('woff2'),
+         url('/fonts/GillsansC.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+}
+
+body {
+    font-family: 'Gill Sans Custom', sans-serif;
+}
