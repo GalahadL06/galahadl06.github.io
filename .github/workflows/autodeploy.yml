@@ -1,0 +1,45 @@
+# GitHub Pages 自动部署触发器
+name: Trigger GitHub Pages Update
+
+on:
+  # ✅ 1. 每天定时运行一次（UTC 0点 → 北京时间早上 8 点）
+  schedule:
+    - cron: '0 0 * * *'
+
+  # ✅ 2. 手动触发（从 GitHub Actions 页面）
+  workflow_dispatch:
+
+  # ✅ 3. 当你本地 hexo d 后推送到 gh-pages 分支时触发
+  push:
+    branches: ["gh-pages"]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'  # 上传整个仓库（gh-pages 分支内容）
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
