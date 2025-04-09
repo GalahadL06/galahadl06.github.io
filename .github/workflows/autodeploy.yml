@@ -1,7 +1,7 @@
 name: Force GitHub Pages Deployment
 
 on:
-  # ✅ 每天 UTC 0 点（北京时间 8 点）触发
+  # ✅ 每天定时运行一次（UTC 0 点，即北京时间早上 8 点）
   schedule:
     - cron: '0 0 * * *'
 
@@ -21,12 +21,14 @@ jobs:
   redeploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Create empty commit to trigger GitHub Pages
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+
+      - name: Create empty commit to trigger GitHub Pages deploy
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git clone --branch gh-pages https://github.com/GalahadL06/galahadl06.github.io gh-pages
-          cd gh-pages
           git commit --allow-empty -m "Trigger GitHub Pages deploy"
-          git push
-
+          git push https://github.com/GalahadL06/galahadl06.github.io.git gh-pages
