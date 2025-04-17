@@ -1,36 +1,29 @@
-name: Force GitHub Pages Deployment
+name: Deploy GitHub Pages
 
 on:
-  # ✅ 每天定时运行一次（UTC 0 点，即北京时间早上 8 点）
   schedule:
-    - cron: '0 0 * * *'
-
-  # ✅ 监听 gh-pages 分支更新时也触发
-  push:
-    branches: ['gh-pages']
-
-  # ✅ 手动触发（可选）
-  workflow_dispatch:
-
-permissions:
-  pages: write
-  id-token: write
-  contents: read
+    - cron: '0 0 * * *'  # 每天 00:00 UTC 自动触发（可按需修改）
+  workflow_dispatch:      # 支持手动触发
 
 jobs:
-  redeploy:
+  deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout gh-pages branch
-        uses: actions/checkout@v4
-        with:
-          ref: gh-pages
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-- name: Commit & Push to gh-pages
-  run: |
-    git config --global user.name "github-actions[bot]"
-    git config --global user.email "github-actions[bot]@users.noreply.github.com"
-    git add .
-    git commit --allow-empty -m "Trigger GitHub Pages deploy"
-    git push https://x-access-token:${{ secrets.GH_PAT }}@github.com/GalahadL06/galahadl06.github.io.git gh-pages
+      - name: Set up Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
+      - name: Make an empty commit
+        run: |
+          git commit --allow-empty -m "Trigger GitHub Pages deploy"
+
+      - name: Push to gh-pages branch
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          git push https://x-access-token:${GH_PAT}@github.com/GalahadL06/galahadl06.github.io.git gh-pages
