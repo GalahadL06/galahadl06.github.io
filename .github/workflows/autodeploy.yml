@@ -29,10 +29,11 @@ jobs:
         with:
           ref: gh-pages
 
-      # Step 4: Modify the index.html file and insert the quote into the subtitle
+      # Step 4: Modify the index.html file and insert quote
       - name: Modify index.html to insert quote
         run: |
-          sed -i '211s|<span id="subtitle" data-typed-text=""></span>|<span id="subtitle" data-typed-text="${{ env.QUOTE }}"></span>|' index.html
+          # Replace content inside data-typed-text attribute using regex
+          sed -i '211s|<span id="subtitle" data-typed-text="[^"]*"></span>|<span id="subtitle" data-typed-text="${{ env.QUOTE }}"></span>|' index.html
 
       # Step 5: Set up Git for commit and push
       - name: Set up Git
@@ -46,5 +47,5 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           git add index.html
-          git commit -m "Update quote in index.html"
+          git diff --cached --exit-code || git commit -m "Update quote in index.html"
           git push https://x-access-token:${GH_PAT}@github.com/GalahadL06/galahadl06.github.io.git gh-pages
