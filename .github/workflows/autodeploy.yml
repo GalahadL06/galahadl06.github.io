@@ -1,28 +1,30 @@
-name: Deploy GitHub Pages
+name: Trigger GitHub Pages
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # 每天 00:00 UTC 自动触发（可按需修改）
-  workflow_dispatch:      # 支持手动触发
+    - cron: '0 0 * * *'  # 每天 UTC 0 点触发
+  workflow_dispatch:      # 手动触发
 
 jobs:
-  deploy:
+  trigger:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout gh-pages branch
         uses: actions/checkout@v3
+        with:
+          ref: gh-pages
 
       - name: Set up Git
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Make an empty commit
+      - name: Create empty commit
         run: |
-          git commit --allow-empty -m "Trigger GitHub Pages deploy"
+          git commit --allow-empty -m "Trigger GitHub Pages refresh: $(date -u +%Y-%m-%dT%H:%M:%SZ)" || echo "No changes to commit"
 
-      - name: Push to gh-pages branch
+      - name: Push to gh-pages
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
