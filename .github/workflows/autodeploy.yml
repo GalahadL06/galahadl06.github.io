@@ -26,10 +26,13 @@ jobs:
         with:
           ref: gh-pages
 
-      - name: Create empty commit to trigger GitHub Pages deploy
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git commit --allow-empty -m "Trigger GitHub Pages deploy"
+- name: Commit & Push to gh-pages
+  run: |
+    git config --global user.name "github-actions[bot]"
+    git config --global user.email "github-actions[bot]@users.noreply.github.com"
+    git add .
+    git commit --allow-empty -m "Trigger GitHub Pages deploy"
+    git push https://x-access-token:${{ secrets.GH_PAT }}@github.com/GalahadL06/galahadl06.github.io.git gh-pages
+
           git push https://x-access-token:${{ secrets.GH_PAT }}@github.com/GalahadL06/galahadl06.github.io.git gh-pages
 
