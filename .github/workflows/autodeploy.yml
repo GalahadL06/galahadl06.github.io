@@ -1,4 +1,4 @@
-name: Trigger GitHub Pages
+name: Update Quote on GitHub Pages
 
 on:
   schedule:
@@ -6,26 +6,45 @@ on:
   workflow_dispatch:      # 手动触发
 
 jobs:
-  trigger:
+  update-quote:
     runs-on: ubuntu-latest
 
     steps:
+      # Step 1: Checkout both main and gh-pages branches
+      - name: Checkout main branch
+        uses: actions/checkout@v3
+        with:
+          ref: main
+
+      # Step 2: Read a random line from daily_quotes.txt
+      - name: Read a random quote from daily_quotes.txt
+        id: read_quote
+        run: |
+          QUOTE=$(shuf -n 1 daily_quotes.txt)
+          echo "QUOTE=${QUOTE}" >> $GITHUB_ENV
+
+      # Step 3: Checkout gh-pages branch
       - name: Checkout gh-pages branch
         uses: actions/checkout@v3
         with:
           ref: gh-pages
 
+      # Step 4: Modify the index.html file and insert the quote into the subtitle
+      - name: Modify index.html to insert quote
+        run: |
+          sed -i '211s|<span id="subtitle" data-typed-text=""></span>|<span id="subtitle" data-typed-text="${{ env.QUOTE }}"></span>|' index.html
+
+      # Step 5: Set up Git for commit and push
       - name: Set up Git
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Create empty commit
-        run: |
-          git commit --allow-empty -m "Trigger GitHub Pages refresh: $(date -u +%Y-%m-%dT%H:%M:%SZ)" || echo "No changes to commit"
-
-      - name: Push to gh-pages
+      # Step 6: Commit and push changes to gh-pages branch
+      - name: Commit and push changes
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
+          git add index.html
+          git commit -m "Update quote in index.html"
           git push https://x-access-token:${GH_PAT}@github.com/GalahadL06/galahadl06.github.io.git gh-pages
