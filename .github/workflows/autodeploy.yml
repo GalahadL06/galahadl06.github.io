@@ -93,12 +93,12 @@ jobs:
               raise AssertionError("Legacy quoting regression no longer reproduces")
           print("Legacy shell quoting failure reproduced")
           
-          edges = ["Don't let quotes break it.", 'He said "hello" & <goodbye>.', r"pipe | slash \\ literal \1 \g<1>", "中文、粤语：你好！", "line one\nline two", "`literal` $(not_a_command)", "$" + "{{ literal }}", ""]
+          edges = ["Don't let quotes break it.", 'He said "hello" & <goodbye>.', "pipe | slash " + chr(92) + " literal " + chr(92) + "1 " + chr(92) + "g<1>", "中文、粤语：你好！", "line one" + chr(10) + "line two", "`literal` $(not_a_command)", "$" + "{{ literal }}", ""]
           for quote in quotes + edges:
               updated = replace_quote(document, quote)
               if replace_quote(updated, quote) != updated:
                   raise AssertionError("Replacement is not idempotent")
-          variants = ['<span class="typed" data-typed-text="old" id="subtitle"></span>', "<span id='subtitle' data-typed-text='old'></span>", "\n" * 300 + '<span id="subtitle" data-typed-text="old"></span>']
+          variants = ['<span class="typed" data-typed-text="old" id="subtitle"></span>', "<span id='subtitle' data-typed-text='old'></span>", chr(10) * 300 + '<span id="subtitle" data-typed-text="old"></span>']
           for fixture in variants:
               if locate(replace_quote(fixture, edges[1]))[2] != edges[1]:
                   raise AssertionError("Markup variation regression")
