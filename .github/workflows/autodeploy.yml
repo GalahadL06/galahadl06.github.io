@@ -11,7 +11,7 @@ on:
         default: false
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: daily-quote-update
@@ -33,7 +33,6 @@ jobs:
         with:
           ref: gh-pages
           path: site
-          token: ${{ secrets.GH_PAT }}
 
       - name: Validate and update quote safely
         shell: python
