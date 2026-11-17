@@ -2,50 +2,132 @@ name: Update Quote on GitHub Pages
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # 每天 UTC 0 点触发
-  workflow_dispatch:      # 手动触发
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+    inputs:
+      verify_only:
+        description: 'Run quote regression checks without publishing'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily-quote-update
+  cancel-in-progress: false
 
 jobs:
   update-quote:
     runs-on: ubuntu-latest
-
     steps:
-      # Step 1: Checkout both main and gh-pages branches
-      - name: Checkout main branch
+      - name: Checkout quote source
         uses: actions/checkout@v3
         with:
-          ref: main
+          ref: ${{ github.ref }}
+          path: control
+          persist-credentials: false
 
-      # Step 2: Read a random line from daily_quotes.txt
-      - name: Read a random quote from daily_quotes.txt
-        id: read_quote
-        run: |
-          QUOTE=$(shuf -n 1 daily_quotes.txt)
-          echo "QUOTE=${QUOTE}" >> $GITHUB_ENV
-
-      # Step 3: Checkout gh-pages branch
-      - name: Checkout gh-pages branch
+      - name: Checkout website
         uses: actions/checkout@v3
         with:
           ref: gh-pages
+          path: site
+          token: ${{ secrets.GH_PAT }}
 
-      # Step 4: Modify the index.html file and insert quote
-      - name: Modify index.html to insert quote
+      - name: Validate and update quote safely
+        shell: python
         run: |
-          # Replace content inside data-typed-text attribute using regex
-          sed -i '211s|<span id="subtitle" data-typed-text="[^"]*"></span>|<span id="subtitle" data-typed-text="${{ env.QUOTE }}"></span>|' index.html
+          import hashlib
+          import html
+          import pathlib
+          import random
+          import re
+          import subprocess
+          from html.parser import HTMLParser
+          
+          ATTRIBUTE = re.compile(r'''(?<![\w:-])data-typed-text\s*=\s*(?:"[^"]*"|'[^']*')''', re.IGNORECASE)
+          
+          def locate(document):
+              offsets = [0] + [m.end() for m in re.finditer("\n", document)]
+              class Subtitle(HTMLParser):
+                  def __init__(self):
+                      super().__init__(convert_charrefs=True)
+                      self.targets = []
+                  def handle_starttag(self, tag, attrs):
+                      attrs = dict(attrs)
+                      if tag == "span" and attrs.get("id") == "subtitle":
+                          raw = self.get_starttag_text()
+                          matches = list(ATTRIBUTE.finditer(raw))
+                          if len(matches) != 1:
+                              raise ValueError("Subtitle must have one data-typed-text attribute")
+                          match = matches[0]
+                          line, column = self.getpos()
+                          start = offsets[line - 1] + column
+                          self.targets.append((start + match.start(), start + match.end(), attrs["data-typed-text"]))
+              parser = Subtitle()
+              parser.feed(document)
+              parser.close()
+              if len(parser.targets) != 1:
+                  raise ValueError("Expected exactly one subtitle span")
+              return parser.targets[0]
+          
+          def replace_quote(document, quote):
+              start, end, _ = locate(document)
+              attribute = 'data-typed-text="' + html.escape(quote, quote=True) + '"'
+              result = document[:start] + attribute + document[end:]
+              if locate(result)[2] != quote:
+                  raise ValueError("Quote did not survive HTML attribute encoding")
+              return result
+          
+          source = pathlib.Path("control/daily_quotes.txt")
+          quotes = [line.strip() for line in source.read_text(encoding="utf-8-sig").splitlines() if line.strip()]
+          if not quotes:
+              raise ValueError("No nonempty daily quotes")
+          page = pathlib.Path("site/index.html")
+          document = page.read_bytes().decode("utf-8")
+          
+          legacy = "sed -i 's|old|Don't lose your way.|' index.html"
+          red = subprocess.run(["bash", "-n", "-c", legacy], capture_output=True, text=True)
+          if red.returncode == 0:
+              raise AssertionError("Legacy quoting regression no longer reproduces")
+          print("Legacy shell quoting failure reproduced")
+          
+          edges = ["Don't let quotes break it.", 'He said "hello" & <goodbye>.', r"pipe | slash \\ literal \1 \g<1>", "中文、粤语：你好！", "line one\nline two", "`literal` $(not_a_command)", "$" + "{{ literal }}", ""]
+          for quote in quotes + edges:
+              updated = replace_quote(document, quote)
+              if replace_quote(updated, quote) != updated:
+                  raise AssertionError("Replacement is not idempotent")
+          variants = ['<span class="typed" data-typed-text="old" id="subtitle"></span>', "<span id='subtitle' data-typed-text='old'></span>", "\n" * 300 + '<span id="subtitle" data-typed-text="old"></span>']
+          for fixture in variants:
+              if locate(replace_quote(fixture, edges[1]))[2] != edges[1]:
+                  raise AssertionError("Markup variation regression")
+          invalid = ["<p>No subtitle</p>", '<span id="subtitle"></span>', '<span id="subtitle" data-typed-text="old"></span>' * 2]
+          for fixture in invalid:
+              try:
+                  replace_quote(fixture, "new")
+              except ValueError:
+                  pass
+              else:
+                  raise AssertionError("Ambiguous or missing target accepted")
+          print(f"Validated {len(quotes)} repository quotes, {len(edges)} special inputs, {len(variants)} markup variants, {len(invalid)} rejection cases")
+          quote = random.choice(quotes)
+          updated = replace_quote(document, quote)
+          if locate(updated)[2] != quote:
+              raise AssertionError("Selected quote mismatch")
+          page.write_bytes(updated.encode("utf-8"))
+          print("selected_quote_sha256=" + hashlib.sha256(quote.encode("utf-8")).hexdigest())
 
-      # Step 5: Set up Git for commit and push
-      - name: Set up Git
+      - name: Commit and publish quote
+        if: github.event_name != 'workflow_dispatch' || inputs.verify_only != true
+        working-directory: site
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
-      # Step 6: Commit and push changes to gh-pages branch
-      - name: Commit and push changes
-        env:
-          GH_PAT: ${{ secrets.GH_PAT }}
-        run: |
-          git add index.html
-          git diff --cached --exit-code || git commit -m "Update quote in index.html"
-          git push https://x-access-token:${GH_PAT}@github.com/GalahadL06/galahadl06.github.io.git gh-pages
+          if git diff --quiet -- index.html; then
+            echo "Quote already current; no commit needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -- index.html
+          git commit -m "Update quote in index.html"
+          git push origin HEAD:gh-pages
